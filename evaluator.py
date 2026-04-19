@@ -7,117 +7,38 @@ from collections import OrderedDict
 from dataclasses import dataclass, replace
 from typing import Dict, Iterable, List, Optional, Sequence, Tuple
 
+import json
+
+EVAL_CONFIG = json.load(open("evaluation_config.json"))
+
+_BLOCK_PHRASES = tuple(EVAL_CONFIG["block_phrases"])
+
 from parser import extract_claims
 
 # --- Stage 1: exclusion heuristics (title + tags only, case-insensitive) -----------------------
 
-_BLOCK_PHRASES: Tuple[str, ...] = (
-    "music video", "official music video", "lyric video", "soundfont", 
-    "ost", "soundtrack", "instrumental", "visualizer", "remix",
-    "satire", "asmr", "parody", "meme", "memetic", "humor", "joke", "jokes",
-)
+
 
 # --- Stage 2: simulated LLM topic tagging (keyword scoring on transcript + light context) -------
 
-_STEM_PATTERNS: Tuple[re.Pattern[str], ...] = (
-    re.compile(r"\b(study|studies|research|hypothesis|experiment|peer[- ]reviewed|dataset)\b", re.I),
-    re.compile(r"\b(gene|dna|rna|protein|molecule|clinical trial|p value|statistic)\b", re.I),
-    re.compile(r"\b(physics|chemistry|biology|mathematics|engineering|arxiv|doi:)\b", re.I),
-    re.compile(r"\b(laboratory|university|institute of)\b", re.I),
-)
+_STEM_PATTERNS = tuple(re.compile(p, re.I) for p in EVAL_CONFIG["patterns"]["stem"])
 
-_POLITICS_PATTERNS: Tuple[re.Pattern[str], ...] = (
-    re.compile(r"\b(election|electorate|congress|senate|parliament|white house)\b", re.I),
-    re.compile(r"\b(president|prime minister|legislation|ballot|polling|campaign)\b", re.I),
-    re.compile(r"\b(policy|sanction|treaty|nato|united nations|geopolitic)\b", re.I),
-    re.compile(r"\b(republican|democrat|gop|liberal|conservative)\b", re.I),
-)
+_POLITICS_PATTERNS = tuple(re.compile(p, re.I) for p in EVAL_CONFIG["patterns"]["politics"])
 
-_POP_PATTERNS: Tuple[re.Pattern[str], ...] = (
-    re.compile(r"\b(celebrity|gossip|red carpet|box office|billboard|chart)\b", re.I),
-    re.compile(r"\b(album|single|tour|concert|festival|streaming)\b", re.I),
-    re.compile(r"\b(movie|film|tv show|series|netflix|premiere)\b", re.I),
-    re.compile(r"\b(fashion|magazine|influencer|viral)\b", re.I),
-)
+_POP_PATTERNS = tuple(re.compile(p, re.I) for p in EVAL_CONFIG["patterns"]["pop"])
 
 # --- SWE / technical tutorial gate (transcript + tags only, before category scoring) ------------
 
-_SWE_TECH_TERMS: Tuple[str, ...] = (
-    "pip",
-    "install",
-    "server",
-    "api",
-    "java",
-    "kotlin",
-    "c++",
-    "c#",
-    "c",
-    "golang",
-    "rust",
-    "scala",
-    "haskell",
-    "ocaml",
-    "prolog",
-    "linux",
-    "windows",
-    "macos",
-    "docker",
-    "kubernetes",
-    "helm",
-    "terraform",
-    "ansible",
-    "puppet",
-    "async",
-    "python",
-    "javascript",
-    "typescript",
-    "react",
-    "node",
-    "express",
-    "next",
-    "nest",
-    "nestjs",
-    "framework",
-    "uvicorn",
-    "fastapi",
-    "localhost",
-    "endpoint",
-    "aws",
-    "database",
-    "apache",
-    "azure",
-    "cloudflare",
-)
+_SWE_TECH_TERMS = tuple(EVAL_CONFIG["swe_tech_terms"])
 
-_SWE_TECH_TERM_COUNT_FORCE = 3
+_SWE_TECH_TERM_COUNT_FORCE = EVAL_CONFIG["swe_tech_term_count_force"]
 
 # --- Computer science / algorithms (LeetCode-style): any hit forces SWE_TECH over Pop Culture ---
 
-_CS_ALGO_PATTERNS: Tuple[re.Pattern[str], ...] = (
-    re.compile(r"\bleetcode\b", re.I),
-    re.compile(r"\bhash\s*map\b|\bhashmap\b", re.I),
-    re.compile(r"\bpointer(s)?\b", re.I),
-    re.compile(r"time\s+complexity", re.I),
-    re.compile(r"space\s+complexity", re.I),
-    re.compile(r"\bbig\s*o\b", re.I),
-    re.compile(r"\bruntime\b", re.I),
-    re.compile(r"\biteration\b", re.I),
-    re.compile(r"\brecursion\b", re.I),
-    re.compile(r"\bsorting\b", re.I),
-    re.compile(r"binary\s+search", re.I),
-    re.compile(r"\barray\b", re.I),
-)
+_CS_ALGO_PATTERNS = tuple(re.compile(p, re.I) for p in EVAL_CONFIG["patterns"]["cs_algo"])
 
-_TUTORIAL_MARKERS = re.compile(
-    r"\b(how\s+to|tutorial|walkthrough)\b",
-    re.I,
-)
-_CODE_NEAR_TUTORIAL = re.compile(
-    r"\b(code|coding|function|def\b|variable|class\b|method|loop|leetcode|algorithm|"
-    r"implement|syntax|runtime|compile|debug|refactor|repository|repo\b|git\b|"
-    r"array|hash\s*map|pointer|complexity|recursion|iteration)\b",
-    re.I,
-)
+_TUTORIAL_MARKERS = re.compile(EVAL_CONFIG["tutorial_markers"], re.I)
+_CODE_NEAR_TUTORIAL = re.compile(EVAL_CONFIG["code_near_tutorial"], re.I)
 
 
 def _has_cs_algo_signal(transcript: str, tags: Sequence[str]) -> bool:
@@ -178,7 +99,7 @@ class _UrlLRUCache:
             self._data.popitem(last=False)
 
 
-_CACHE = _UrlLRUCache(maxsize=1000)
+_CACHE = _UrlLRUCache(EVAL_CONFIG["cache_maxsize"])
 
 
 def _normalize_video_url(url: str) -> str:
@@ -225,9 +146,6 @@ def get_video_category(
        software engineering, platforms, APIs, and hands-on technical tutorials
        grounded in official docs and repos.
 
-    5) If there are no claims being made based on the transcript, 
-        the video is not eligible for fact-checking. Return "No claims".
-
     Context for scoring uses title, description, tags, and transcript; SWE
     overrides (1–3) use transcript + tags only.
     """
@@ -250,16 +168,36 @@ def get_video_category(
     }
 
     # Safety valve for low-signal videos
-    if len(transcript.split()) < 50 :
-         return "INELIGIBLE_LOW_INFORMATION_DENSITY"
+    # For full transcripts, require minimum word count
+    # For individual claims (no title/description/tags), be more lenient
+    word_count = len(transcript.split())
+    is_full_transcript = bool(title or description or tags)
+    
+    if is_full_transcript and word_count < 20:
+        return "INELIGIBLE_LOW_INFORMATION_DENSITY"
+    
+    # For short claims, require at least some category signal
+    if not is_full_transcript and word_count < 20:
+        if max(scores.values()) > 0:
+            pass  # Has signal, continue
+        else:
+            return "INELIGIBLE_UNCERTAIN"
 
-    # Calculate scores...
     best_category = max(scores, key=scores.get)
     
     # If the highest score is still 0, it's not a factual video we can categorize
     if scores[best_category] == 0:
         return "INELIGIBLE_UNCERTAIN"
     return best_category
+
+
+def categorize_claim(claim_text: str) -> str:
+    """
+    Categorize an individual claim sentence.
+    Uses the same pattern matching as get_video_category but without
+    title/description/tags context.
+    """
+    return get_video_category(claim_text, title="", description="", tags=None)
 
 
 def run_initial_analysis(
@@ -299,7 +237,7 @@ def run_initial_analysis(
         description=description,
         tags=tags,
     )
-    claims = tuple(extract_claims(transcript_text))
+    claims = tuple(extract_claims(transcript_text)) # uses fixed parser logic
     result = InitialAnalysisResult(
         eligible=True,
         skip_reason=None,

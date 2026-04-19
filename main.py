@@ -9,7 +9,8 @@ from typing import Dict, List, Optional
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field, HttpUrl
 
-from evaluator import run_initial_analysis
+from parser import extract_claims
+from evaluator import run_initial_analysis, categorize_claim
 from models import Claim, TopicType
 from youtube_fetch import YouTubeFetchError, fetch_youtube_for_analysis
 
@@ -74,13 +75,20 @@ def analyze_video(body: AnalyzeVideoRequest) -> AnalyzeVideoResponse:
     video_key = bundle.video_id or url_str
     claims_models: List[Claim] = []
     if analysis.eligible and analysis.topic_category:
-        tag = analysis.topic_category
+        # Use video-level category as fallback, but categorize each claim individually
+        video_category = analysis.topic_category
         for statement in analysis.claims:
+            # Categorize each claim individually for more accurate topic tagging
+            claim_category = categorize_claim(statement)
+            # If claim categorization fails, fall back to video category
+            if claim_category.startswith("INELIGIBLE"):
+                claim_category = video_category
+            
             claims_models.append(
                 Claim(
                     statement=statement,
                     source_video_id=video_key,
-                    topic_tag=tag,
+                    topic_tag=claim_category,
                     timestamp=None,
                 )
             )
