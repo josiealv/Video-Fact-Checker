@@ -23,7 +23,9 @@
             "\\b(study|studies|research|hypothesis|experiment|peer[- ]reviewed|dataset)\\b",
             "\\b(gene|dna|rna|protein|molecule|clinical trial|p value|statistic)\\b",
             "\\b(physics|chemistry|biology|mathematics|engineering|arxiv|doi:)\\b",
-            "\\b(laboratory|university|institute of)\\b"
+            "\\b(laboratory|university|institute of)\\b",
+            "\\b(explosive|explosives|detonation|detonated|demolition)\\b",
+            "\\b(steel beam|support column|structural|debris|evidence|forensic)\\b"
         ],
         "politics": [
             "\\b(election|electorate|congress|senate|parliament|white house)\\b",
@@ -31,13 +33,15 @@
             "\\b(policy|sanction|treaty|nato|united nations|geopolitic|diplomacy|diplomatic)\\b",
             "\\b(republican|democrat|gop|liberal|conservative)\\b",
             "\\b(iran|nuclear weapon|enriched uranium|ballistic missile|blockade|delegation|negotiation|negotiations)\\b",
-            "\\b(military|navy|war|conflict|threat|national security)\\b"
+            "\\b(military|navy|war|conflict|threat|national security)\\b",
+            "\\b(9/11|world trade center|twin towers|terrorist attack|terrorism|conspiracy theory)\\b",
+            "\\b(federal government|government agency|investigation|intelligence)\\b"
         ],
         "pop": [
             "\\b(celebrity|gossip|red carpet|box office|billboard|chart)\\b",
-            "\\b(album|single|tour|concert|festival|streaming)\\b",
+            "\\b(album|music single|tour|concert|festival|streaming service)\\b",
             "\\b(movie|film|tv show|series|netflix|premiere)\\b",
-            "\\b(fashion|magazine|influencer|viral)\\b"
+            "\\b(fashion|magazine|influencer|viral video)\\b"
         ],
         "cs_algo": [
             "\\bleetcode\\b",
