@@ -102,6 +102,7 @@ class ClaimCheckResult(BaseModel):
     verdict: ClaimVerdict
     supporting_sources: Tuple[SourceArticle, ...] = ()
     contradicting_sources: Tuple[SourceArticle, ...] = ()
+    reasoning: str = ""
 
 
 class FactCheckReport(BaseModel):

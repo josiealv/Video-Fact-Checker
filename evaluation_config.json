@@ -25,7 +25,9 @@
             "\\b(physics|chemistry|biology|mathematics|engineering|arxiv|doi:)\\b",
             "\\b(laboratory|university|institute of)\\b",
             "\\b(explosive|explosives|detonation|detonated|demolition)\\b",
-            "\\b(steel beam|support column|structural|debris|evidence|forensic)\\b"
+            "\\b(steel beam|support column|structural|debris|evidence|forensic)\\b",
+            "\\b(moon landing|apollo|astronaut|nasa|space program|rocket|spacecraft)\\b",
+            "\\b(technology|technological|computing power|equipment|blueprint)\\b"
         ],
         "politics": [
             "\\b(election|electorate|congress|senate|parliament|white house)\\b",

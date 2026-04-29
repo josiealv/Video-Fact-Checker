@@ -51,9 +51,10 @@ async def _reason_claim_verdict(
     claim: Claim,
     ranked: List[SourceArticle],
     snippets: Dict[str, str],
-) -> Tuple[ClaimVerdict, Tuple[SourceArticle, ...], Tuple[SourceArticle, ...]]:
+) -> Tuple[ClaimVerdict, Tuple[SourceArticle, ...], Tuple[SourceArticle, ...], str]:
     """
     Second LLM pass: decide support vs contradiction using ranked sources + snippets.
+    Returns: (verdict, supporting_sources, contradicting_sources, reasoning)
     """
     openai_key = get_openai_api_key()
     if not openai_key:
@@ -71,9 +72,10 @@ async def _reason_claim_verdict(
     system = (
         "You are a careful fact checker. Given a claim and ranked sources, respond JSON only:\n"
         '{"verdict": "supported"|"contradicted"|"unverified"|"mixed", '
-        '"supporting_indices": number[], "contradicting_indices": number[]}\n'
+        '"supporting_indices": number[], "contradicting_indices": number[], '
+        '"reasoning": "brief explanation of why the claim is true/false based on sources"}\n'
         "Use only indices provided. If evidence is weak or off-topic, use unverified. "
-        "mixed when sources disagree materially."
+        "mixed when sources disagree materially. Keep reasoning concise (1-2 sentences)."
     )
     user = f"Claim:\n{claim.statement}\n\nSources:\n{bundle}\n"
     completion = await oai.chat.completions.create(
@@ -88,6 +90,7 @@ async def _reason_claim_verdict(
     raw = completion.choices[0].message.content or "{}"
     data = json.loads(raw)
     verdict_raw = (data.get("verdict") or "unverified").strip().lower()
+    reasoning = data.get("reasoning", "")
     try:
         verdict = ClaimVerdict(verdict_raw)
     except ValueError:
@@ -108,7 +111,7 @@ async def _reason_claim_verdict(
     con_idx = _pick_indices("contradicting_indices")
     supporting = tuple(ranked[i] for i in sup_idx)
     contradicting = tuple(ranked[i] for i in con_idx)
-    return verdict, supporting, contradicting
+    return verdict, supporting, contradicting, reasoning
 
 
 async def run_fact_check(video_id: str, *, use_cache: bool = True) -> dict:
@@ -143,7 +146,7 @@ async def run_fact_check(video_id: str, *, use_cache: bool = True) -> dict:
         global_pool.extend(scored_all)
         top3 = scored_all[:3]
 
-        verdict, supporting, contradicting = await _reason_claim_verdict(
+        verdict, supporting, contradicting, reasoning = await _reason_claim_verdict(
             claim, top3, snippets
         )
         claim_results.append(
@@ -152,6 +155,7 @@ async def run_fact_check(video_id: str, *, use_cache: bool = True) -> dict:
                 verdict=verdict,
                 supporting_sources=supporting,
                 contradicting_sources=contradicting,
+                reasoning=reasoning,
             )
         )
 

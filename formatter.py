@@ -83,7 +83,7 @@ def format_final_report(
     """
     User-friendly JSON:
     - summary: concise accuracy overview
-    - flagged_claims: contradicted claims + best (prefer score 1.0) refutation link
+    - flagged_claims: contradicted claims + best refutation link + reasoning
     - top_educational_sources: two most credible unique links seen overall
     """
     flagged: List[Dict[str, Any]] = []
@@ -94,6 +94,7 @@ def format_final_report(
         entry: Dict[str, Any] = {
             "claim": r.claim.statement,
             "verdict": r.verdict.value,
+            "reasoning": r.reasoning,
         }
         if ref is not None:
             entry["refutation_source"] = _article_to_link_dict(ref)

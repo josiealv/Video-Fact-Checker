@@ -26,17 +26,42 @@ _CHECKABLE_PATTERNS = _CHECKABLE_TECH
 _CHECKABLE_PATTERNS += [re.compile(p, re.I) for p in EVAL_CONFIG["patterns"]["politics"] + EVAL_CONFIG["patterns"]["stem"] + EVAL_CONFIG["patterns"]["pop"]]
 _CHECKABLE_PATTERNS.append(re.compile(r"\b(president|gas|index|increase|negotiation|delegation|commitment|stockpile|threat|congress|senate|policy|ballot)\b", re.I))
 
-_SPLIT = re.compile(r"(?<=[.!?])\s+|\n+")
+_SPLIT = re.compile(r"(?<=[.!?])\s+|(?:\n\s*){2,}")
 _MIN_LEN = 10  # lowered
 _MAX_CLAIMS = 100  # increased
+
+
+def _reconstruct_sentences(transcript: str) -> List[str]:
+    """Reconstruct sentences from poorly punctuated transcripts."""
+    # Replace single newlines with spaces
+    text = re.sub(r'\n', ' ', transcript)
+    # Normalize whitespace
+    text = re.sub(r'\s+', ' ', text).strip()
+    
+    # Split into chunks of reasonable length (30-150 words)
+    words = text.split()
+    sentences = []
+    current = []
+    
+    for word in words:
+        current.append(word)
+        # Create sentence breaks at 30-80 words
+        if len(current) >= 30:
+            sentence = ' '.join(current)
+            sentences.append(sentence)
+            current = []
+    
+    if current:
+        sentences.append(' '.join(current))
+    
+    return sentences
 
 
 def extract_claims(transcript: str) -> List[str]:
     if not transcript.strip():
         return []
     
-    chunks = _SPLIT.split(transcript.strip())
-    raw_chunks = [chunk.strip() for chunk in chunks if chunk.strip()]
+    raw_chunks = _reconstruct_sentences(transcript)
     
     seen = set()
     claims = []
