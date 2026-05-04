@@ -101,6 +101,28 @@ _VERIFIED_SOCIAL_HINTS = frozenset(
     }
 )
 
+# --- Low credibility hosts (Q&A sites, personal blogs) ----------------------------------------
+
+_LOW_CREDIBILITY_HOSTS = frozenset(
+    {
+        "quora.com",
+        "answers.yahoo.com",
+        "ask.com",
+        "answers.com",
+        "blogspot.com",
+        "wordpress.com",
+    }
+)
+
+_VERIFIED_MEDIUM_PUBLICATIONS = frozenset(
+    {
+        "towardsdatascience.com",
+        "betterprogramming.pub",
+        "javascript.plainenglish.io",
+        "levelup.gitconnected.com",
+    }
+)
+
 # --- SWE / software-engineering source tiers (TopicType.SWE_TECH) -----------------------------
 
 _SWE_OFFICIAL_DOC_HOSTS = frozenset(
@@ -210,6 +232,20 @@ def _is_industry_magazine_publisher(publisher: str) -> bool:
     return any(m in p for m in _INDUSTRY_MAGAZINES)
 
 
+def _is_low_credibility_host(article: SourceArticle) -> bool:
+    """Check if source is from a low-credibility Q&A or personal blog site."""
+    host = _host_key(str(article.url))
+    url_str = str(article.url)
+    
+    # Check direct blocklist
+    if any(blocked in host for blocked in _LOW_CREDIBILITY_HOSTS):
+        # Exception: Medium verified publications
+        if "medium.com" in host:
+            return not any(pub in url_str for pub in _VERIFIED_MEDIUM_PUBLICATIONS)
+        return True
+    return False
+
+
 def _is_academic_publisher_or_host(article: SourceArticle) -> bool:
     pub = _publisher_blob(article)
     if any(frag in pub for frag in _ACADEMIC_PUBLISHER_FRAGMENTS):
@@ -315,6 +351,8 @@ def _score_swe_tech(article: SourceArticle) -> float:
     Tie-breaks when scores tie: ``sort_key`` uses ``citation_count`` (proxy for
     cross-linkage) then ``has_structured_data`` (per ``SourceRanker.sort_key``).
     """
+    if _is_low_credibility_host(article):
+        return 0.05
     url_str = str(article.url)
     if _swe_is_official_documentation(url_str):
         return 1.0
@@ -351,6 +389,8 @@ class SourceRanker:
 
     @staticmethod
     def _score_politics_news(article: SourceArticle) -> float:
+        if _is_low_credibility_host(article):
+            return 0.05
         if _is_accredited_news_publisher(article.publisher):
             return 1.0
         if _looks_eyewitness(article):
@@ -360,6 +400,8 @@ class SourceRanker:
     @staticmethod
     def _score_stem(article: SourceArticle) -> float:
         # Apply the strict ladder: institution > corroboration > structured data.
+        if _is_low_credibility_host(article):
+            return 0.05
         if _is_academic_publisher_or_host(article):
             return 1.0
         if article.citation_count >= 2:
@@ -370,6 +412,8 @@ class SourceRanker:
 
     @staticmethod
     def _score_pop_culture(article: SourceArticle) -> float:
+        if _is_low_credibility_host(article):
+            return 0.05
         if _is_industry_magazine_publisher(article.publisher):
             return 1.0
         if _looks_verified_social(article):
@@ -378,6 +422,8 @@ class SourceRanker:
 
     @staticmethod
     def _score_general(article: SourceArticle) -> float:
+        if _is_low_credibility_host(article):
+            return 0.05
         if article.citation_count >= 3:
             return 1.0
         if article.citation_count <= 1:
